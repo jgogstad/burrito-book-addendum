@@ -11,6 +11,7 @@
   - [Higher kinded types](#higher-kinded-types)
   - [Kind projector](#kind-projector)
   - [Referential transparency](#referential-transparency)
+  - [IO Monad](#io-monad)
 - [Chapter 2](#chapter-2)
   - [Cats syntax: `>>` , `*>`](#cats-syntax---)
   - [Sequential vs concurrent state](#sequential-vs-concurrent-state)
@@ -196,6 +197,14 @@ class Users[F[_]: AppThrow]
 ## Referential transparency
 
 The wikipedia text on [Referential transparency](https://en.wikipedia.org/wiki/Referential_transparency) does a good job of explaining this concept. Have a look at the section ["Another example"](https://en.wikipedia.org/wiki/Referential_transparency#Another_example) if the text becomes too abstract at some point.
+
+In summary:
+
+TBD
+
+## IO Monad
+
+TBD
 
 # Chapter 2
 

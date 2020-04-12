@@ -83,7 +83,7 @@ val prettyElephant: PrettyPrint[Elephant] = new PrettyPrint[Elephant] {
 
 The two examples above are called _subtype polymorphism_ and _ad hoc polymorphism_ respectively. One obvious difference is that in order to express polymorphism using subtyping you need to alter and compile one side of the association. This is not necessary with the ad-hoc encoding: you may define an interface and implementations for types that are already compiled without recompiling them, hence the name "ad-hoc".
 
-You may wonder how you could easily use implementations encoded with ad-hoc polymorphism. For Scala specifically the answer lies in the implicit mechanism. Please see the cats book for examples. 
+You may wonder how you could easily use implementations encoded with ad-hoc polymorphism. For Scala specifically the answer lies in the implicit mechanism. We will come back to this when discussing the finer details of Scala's implicit scope.
 
 Type classes are interfaces expressed with the ad-hoc encoding with the additional constraint that they are _coherent_. 
 
@@ -137,7 +137,17 @@ The star here is not to be mixed up with the star in the kind projector in the n
 
 You'll recognize kinds as the mechanism we use to abstract over types. For instance, in the definition `class List[A]` we're restricting the _shape_ of the type parameter to `List`. You can pass it anything from the top row in the table above, but not any rows below because they don't belong to the correct kind.
 
-Here's an exercise for you: open a REPL and define a function with a type parameter, play around with what types to can pass to it (I use [Ammonite](https://ammonite.io) below). Try out the types in the table above:
+The shapes in the bottom two rows are examples of what we refer to as "Higher kinded types". They are characterized by taking not a value type (e.g. `A`) as a type parameter, but another kind. What are the use of this? It lets us create interfaces that abstracts over other kinds, think ad-hoc polymorphism, example:
+
+```
+trait Functor[F[_]] {
+  def map[A, B](fa: F[A])(f: A => B): F[B]
+}
+```
+
+This interface defines a `map` method, and it can only be implemented for types that has a hole. For example, `List` and `Option`, but not `Elephant`, `Map` or `Either`. 
+
+Here's an exercise for you: open a REPL and define a function with a type parameter, play around with what types you can pass to it (I use [Ammonite](https://ammonite.io) below). Try out the types in the table above:
 
 ```
 @ def foo[F[_,_]]: String = "foo"
@@ -169,7 +179,9 @@ Function2[-*, Long, +*]  // equivalent to: type R[-A, +B] = Function2[A, Long, B
 EitherT[*[_], Int, *]    // equivalent to: type R[F[_], B] = EitherT[F, Int, B]
 ```
 
-You place the `*` where you want the new holes to be; the new holes will have shape `_`. If you need to make a hole with shape `_[_]` instead, you use `*[_]` instead of `*`. The only use case for this is to not have to name the new type, as you would've done if you created a type alias (`R` in the example above).
+You place the `*` where you want the new holes to be; the new holes will have shape `_`. If you need to make a hole with shape `_[_]` instead, you use `*[_]` instead of `*`. 
+
+The only use case for the kind projector plugin is to not have to name new types in order to create a new shape. You see how you could create a type alias instead of using the kind projector plugin in the comments of the listing above (they're all called `R`).
 
 Back to the `Users` example we started with, these are three ways of declaring exactly the same thing. It should hopefully clear up any confusion:
 
@@ -227,7 +239,7 @@ If two computations are composed with `*>` it means that they could've been para
 
 ## Sequential vs concurrent state
 
-
+TBD
 
 # References
 

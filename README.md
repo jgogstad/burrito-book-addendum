@@ -32,7 +32,7 @@ The book states in its prerequisites that  "This book is considered intermediate
 
 We endevour to lower the bar with this text. Our goal is that if you know your way around Scala, you can go through the shopping cart example in "Practical FP in Scala" and then be fully productive in code bases written in a functional style.
 
-This is if course not a substitue for learning functional programming fundamentals, but we find that requiring new team members to go through the [Red Book](https://www.amazon.com/Functional-Programming-Scala-Paul-Chiusano/dp/1617290653) then [Scala with Cats](https://underscore.io/books/scala-with-cats/), and then maybe "Practical FP in Scala" is neither realistic nor practical. We strongly believe that everyone can appreciate and be productive in functional code bases without a high up-front investment in understanding the fundamentals.
+This is if course not a substitue for learning functional programming fundamentals, but we find that requiring new team members to go through the [Red Book] then [Scala with Cats](https://underscore.io/books/scala-with-cats/), and then maybe "Practical FP in Scala" is neither realistic nor practical. We strongly believe that everyone can appreciate and be productive in functional code bases without a high up-front investment in understanding the fundamentals.
 
 # Prequisites and Chapter 1
 
@@ -146,7 +146,7 @@ trait Functor[F[_]] {
 }
 ```
 
-This interface defines a `map` method, and it can only be implemented for types that has a hole. For example, `List` and `Option`, but not `Elephant`, `Map` or `Either`. 
+This interface defines a `map` method, and it can only be implemented for types that has a hole. For example, `List` and `Option`, but not `Elephant`, `Map` or `Either`. We use the type class encoding for polymorphism here because there is no alternative in Scala! That is, there is no way we can create an interface and have a restriction that subtypes of it must have a hole. In languages that doesn't support higher kinded types, this kind of abstraction is not possible to express.
 
 Here's an exercise for you: open a REPL and define a function with a type parameter, play around with what types you can pass to it (I use [Ammonite](https://ammonite.io) below). Try out the types in the table above:
 
@@ -198,15 +198,49 @@ class Users[F[_]: AppThrow]
 
 The wikipedia text on [Referential transparency](https://en.wikipedia.org/wiki/Referential_transparency) does a good job of explaining this concept. Have a look at the section ["Another example"](https://en.wikipedia.org/wiki/Referential_transparency#Another_example) if the text becomes too abstract at some point.
 
-In summary:
+I like to highlight that in a program where all expressions are referentially transparent, the semantics of the equals sign (`=`) has changed from what it means in an imperative program. It now means "equals" and not "result of", example:
 
-TBD
+```
+round1(incrementCounter(3)) >> round2(incrementCounter(3))
+
+// If all functions are referentially transparent, we can refactor to
+val increment = incrementCounter(3)
+round1(increment) >> round2(increment)
+```
+
+The equal sign literally means _equals_. The left hand side is just an alias for the right hand side. They can be used interchangeably. 
 
 ## IO Monad
 
-TBD
+The semantics of `IO[A]` is "a lazily evaluated `A`, the evaluation might fail". The `IO` type from cats-effect has the additional clause "…, and the evaluation might be cancelled", we will return to that later in this text. Note that the IO monad is very similar to the `Try` monad: `Try[A]` is "an eagerly evaluated computation of `A` that might have failed". It doesn't have laziness and it doesn't have cancellation, but apart from that they are the same.
+
+The take away here is that it's lazy; the IO monad is just a means to achieve laziness. If you ever go through the [Red Book], you will notice that the author doesn't introduce the IO monad until the last chapters since we can encode laziness just as well with regular functions; just use thunks (aka. `() => A`) instead of `A`. In almost all modern Scala though, we use `IO` and that is also what the Practical FP in Scala uses.
+
+I like to highlight that when all side effects in a program is lazily evaluated, the programmer needs to be explicit about how to compose them, example:
+
+```
+def run(args: Array[String]): IO[ExitCode] = {
+  val context: IO[Counters] = initializeCounters(args)
+  val database: IO[Database] = setupDatabase(args)
+  
+  (context, database).mapN(runLogic).as(ExitCode.Success)
+}
+
+def runLogic(counters: Counters, database: Database): IO[Unit] = ???
+
+```
+
+Since line 2 and 3 has no side effects, we need to _either_ compose them with `flatMap` or compose them with `map2` or `mapN`. Remember that `flatMap` means "evaluate the first argument, _then_ evaluate the second one", while `mapN` means "evalute these two arguments, they are independent" (which is why the callback gets passed the result of both at the same time).
+
+In other words, we express in the code snippet above that `initializeCounters` and `setupDatabase` might be parallelized if future maintainers of the code desires to do so. If we had composed with `flatMap` (or a `for`-comprehension) instead, we would've stated the opposite, they may _not_ be parallelized even though they look independent from their signature.
+
+There are some finer points to cats effect's IO monad, and if you're interested, the [official documentation](https://typelevel.org/cats-effect/datatypes/io.html) is pretty good (and long). You will get far by just remembering that `IO[A]` is a lazily computed `A` though.
 
 # Chapter 2
+
+## Effectful computations, `F[_]`
+
+TBD
 
 ## Cats syntax: `>>` , `*>` 
 
@@ -253,3 +287,9 @@ TBD
 # References
 
 [1] https://www.microsoft.com/en-us/research/wp-content/uploads/1997/01/multi.pdf
+
+
+
+
+
+[Red Book]: https://www.amazon.com/Functional-Programming-Scala-Paul-Chiusano/dp/1617290653

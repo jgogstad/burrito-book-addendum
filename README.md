@@ -5,23 +5,35 @@
 
 
 - [Introduction](#introduction)
-- [Type class recap](#type-class-recap)
-- [Type class coherence](#type-class-coherence)
-- [Higher kinded types](#higher-kinded-types)
-- [Kind projector](#kind-projector)
-- [Cats syntax: `>>` , `*>`](#cats-syntax---)
+- [Prequisites and Chapter 1](#prequisites-and-chapter-1)
+  - [Type class recap](#type-class-recap)
+  - [Type class coherence](#type-class-coherence)
+  - [Higher kinded types](#higher-kinded-types)
+  - [Kind projector](#kind-projector)
+  - [Referential transparency](#referential-transparency)
+- [Chapter 2](#chapter-2)
+  - [Cats syntax: `>>` , `*>`](#cats-syntax---)
+  - [Sequential vs concurrent state](#sequential-vs-concurrent-state)
 - [References](#references)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-## Introduction
+# Introduction
 
-The book [Practical FP in Scala](https://leanpub.com/pfp-scala) book states in its prerequisites that "This book is considered intermediate to advanced" and that the reader is expected to be familiar with a list of topics along with a list of reading materials.
+This text is based on common questions and comments we get when onboarding existing Scala programmers to functional code bases in Tapad. It's presented as a commentary and addendum to the book [Practical FP in Scala](https://leanpub.com/pfp-scala); this book does a good job of explaining and demonstrating today's typical typelevel-stack-based Scala application. Discussions and questions from our internal bookclub on this book is repeated in this document for the benefit of future readers.
 
-This document tries to bridge the gap between the [Scala with Cats](https://underscore.io/books/scala-with-cats/) book and Practical FP in Scala. It's written based on experience from onboarding team members to functional style code bases in Tapad, as well as book clubs on these books.
+The book states in its prerequisites that  "This book is considered intermediate to advanced" and that the reader is required to be familiar with the following topics:
 
-If you've just been given a purely functional code base written in tagless final style and you reached to Practical FP in Scala for help, or you're just looking for a quick recap with some examples, this document will hopefully bring you up to speed.
+* Higher-Kinded Types (HKTs)
+* Type classes
+* IO Monad
+* Referential Transparency
 
+We endevour to lower the bar with this text. Our goal is that if you know your way around Scala, you can go through the shopping cart example in "Practical FP in Scala" and then be fully productive in code bases written in a functional style.
+
+This is if course not a substitue for learning functional programming fundamentals, but we find that requiring new team members to go through the [Red Book](https://www.amazon.com/Functional-Programming-Scala-Paul-Chiusano/dp/1617290653) then [Scala with Cats](https://underscore.io/books/scala-with-cats/), and then maybe "Practical FP in Scala" is neither realistic nor practical. We strongly believe that everyone can appreciate and be productive in functional code bases without a high up-front investment in understanding the fundamentals.
+
+# Prequisites and Chapter 1
 
 ## Type class recap
 
@@ -138,8 +150,6 @@ res2: String = "foo"
 Compilation Failed
 ```
 
-
-
 ## Kind projector
 
 The Scala [kind projector plugin](https://github.com/typelevel/kind-projector) is a compiler plugin that you might encounter in the wild, and that you do encounter in the "Practical FP in Scala" book. It looks like this
@@ -171,7 +181,11 @@ type AppThrow[F[_]] = ApplicativeThrowing[F, Throwable]
 class Users[F[_]: AppThrow]
 ```
 
+## Referential transparency
 
+The wikipedia text on [Referential transparency](https://en.wikipedia.org/wiki/Referential_transparency) does a good job of explaining this concept. Have a look at the section ["Another example"](https://en.wikipedia.org/wiki/Referential_transparency#Another_example) if the text becomes too abstract at some point.
+
+# Chapter 2
 
 ## Cats syntax: `>>` , `*>` 
 
@@ -211,6 +225,10 @@ If two computations are composed with `*>` it means that they could've been para
 
 <footnote 1>: The actual implementation of `*>`, or `productRight`, uses `ap` from Applicative, but it _could've_ used `mapN`. The implementation of `productLeft`, or `<*` does this.
 
-## References
+## Sequential vs concurrent state
+
+
+
+# References
 
 [1] https://www.microsoft.com/en-us/research/wp-content/uploads/1997/01/multi.pdf

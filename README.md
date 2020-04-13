@@ -100,7 +100,7 @@ val prettyElephant: PrettyPrint[Elephant] = a => "An elephant named ${a.name}"
 val veryPrettyElephant: PrettyPrint[Elephant] = a => "-=- An elephant named ${a.name} -=-"
 ```
 
-_Coherence_ refers to the situation when
+_Coherence_ refers to a situation when
 
 > … every different valid typing derivation for a program leads to a resulting program that has the same dynamic semantics.
 >
@@ -136,11 +136,11 @@ We categorize kinds very much like we categorize functions. Just like all functi
 | (* -> *) -> *      | `_[_[_]]` or `F[_[_]]`       | `Monad`, `Functor`, `UserService[F[_]]`                 |
 | (* -> *) -> * -> * | `_[_[_], _]` or `F[_[_], _]` | `cats.effect.Resource`                                  |
 
-The star here is not to be confused with the star in the kind projector in the next section. The star here is the formal syntax for kinds, you'll encounter this in texts on kinds, we include it for completion, but it's the first and last you'll see of it in this text. The "scala shape" column is the encoding Scala uses. It's not the easiest to read!
+The star here is not to be confused with the star in the kind projector in the next section. The star here is the formal syntax for kinds, you'll encounter this in texts on kinds. We include it here for completion, but it's the first and last you'll see of it in this text. The "scala shape" column is the encoding Scala uses. It's not the easiest to read!
 
 You'll recognize kinds as the mechanism we use to abstract over types. For instance, in the definition `class List[A]` we're restricting the _shape_ of the type parameter to `List` to that of `_` (or `A`). You can pass it anything from the top row in the table above, but not any rows below because they don't belong to the correct kind; `List[IO[HttpResponse]]` compiles, but `IO[Option]` doesn't.
 
-The shapes in the bottom two rows are examples of what we refer to as "Higher kinded types". They are characterized by taking not a value type (e.g. `A`) as a type parameter, but another kind. What are the use of this? It lets us create interfaces that abstracts over other kinds, think ad-hoc polymorphism, example:
+The shapes in the bottom two rows are examples of what we refer to as "Higher kinded types". They are characterized by taking not a value type (e.g. `A`) as a type parameter, but another kind. What is the use of this? It lets us create interfaces that abstracts over other kinds, think ad-hoc polymorphism, example:
 
 ```
 trait Functor[F[_]] {

@@ -12,7 +12,9 @@
   - [Kind projector](#kind-projector)
   - [Referential transparency](#referential-transparency)
   - [IO Monad](#io-monad)
+  - [Further reading](#further-reading)
 - [Chapter 2](#chapter-2)
+  - [Effectful computations, `F[_]`](#effectful-computations-f_)
   - [Cats syntax: `>>` , `*>`](#cats-syntax---)
   - [Sequential vs concurrent state](#sequential-vs-concurrent-state)
 - [References](#references)
@@ -134,9 +136,9 @@ We categorize kinds very much like we categorize functions. Just like all functi
 | (* -> *) -> *      | `_[_[_]]` or `F[_[_]]`       | `Monad`, `Functor`, `UserService[F[_]]`                 |
 | (* -> *) -> * -> * | `_[_[_], _]` or `F[_[_], _]` | `cats.effect.Resource`                                  |
 
-The star here is not to be mixed up with the star in the kind projector in the next section. The star here is the formal syntax for kinds, if you want to read more about kinds, you'll encounter this. The "scala shape" column is the encoding Scala uses. It's not the easiest to read!
+The star here is not to be confused with the star in the kind projector in the next section. The star here is the formal syntax for kinds, you'll encounter this in texts on kinds, we include it for completion, but it's the first and last you'll see of it in this text. The "scala shape" column is the encoding Scala uses. It's not the easiest to read!
 
-You'll recognize kinds as the mechanism we use to abstract over types. For instance, in the definition `class List[A]` we're restricting the _shape_ of the type parameter to `List`. You can pass it anything from the top row in the table above, but not any rows below because they don't belong to the correct kind.
+You'll recognize kinds as the mechanism we use to abstract over types. For instance, in the definition `class List[A]` we're restricting the _shape_ of the type parameter to `List` to that of `_` (or `A`). You can pass it anything from the top row in the table above, but not any rows below because they don't belong to the correct kind; `List[IO[HttpResponse]]` compiles, but `IO[Option]` doesn't.
 
 The shapes in the bottom two rows are examples of what we refer to as "Higher kinded types". They are characterized by taking not a value type (e.g. `A`) as a type parameter, but another kind. What are the use of this? It lets us create interfaces that abstracts over other kinds, think ad-hoc polymorphism, example:
 
@@ -146,7 +148,7 @@ trait Functor[F[_]] {
 }
 ```
 
-This interface defines a `map` method, and it can only be implemented for types that has a hole. For example, `List` and `Option`, but not `Elephant`, `Map` or `Either`. We use the type class encoding for polymorphism here because there is no alternative in Scala! That is, there is no way we can create an interface and have a restriction that subtypes of it must have a hole. In languages that doesn't support higher kinded types, this kind of abstraction is not possible to express.
+Remember that that with ad-hoc polymorphism we take the implementing type as a type parameter. The interface above defines a `map` method, and it can only be implemented for types that has a hole. For example, `List`, `Option` and `IO`, but not `Elephant`, `Either` or `Monad`. We use the type class encoding for polymorphism here because there is no alternative in Scala! That is, there is no way we can create an interface and have a restriction that subtypes of it must have a hole. In languages that doesn't support higher kinded types, this kind of abstraction is not possible to express.
 
 Here's an exercise for you: open a REPL and define a function with a type parameter, play around with what types you can pass to it (I use [Ammonite](https://ammonite.io) below). Try out the types in the table above:
 
@@ -212,9 +214,9 @@ The equal sign literally means _equals_. The left hand side is just an alias for
 
 ## IO Monad
 
-The semantics of `IO[A]` is "a lazily evaluated `A`, the evaluation might fail". The `IO` type from cats-effect has the additional clause "…, and the evaluation might be cancelled", we will return to that later in this text. Note that the IO monad is very similar to the `Try` monad: `Try[A]` is "an eagerly evaluated computation of `A` that might have failed". It doesn't have laziness and it doesn't have cancellation, but apart from that they are the same.
+The semantics of `IO[A]` is "a lazily evaluated `A`, the evaluation might fail". The `IO` type from cats-effect has the additional clause "…, and the evaluation might be cancelled", we will return to that later in this text. Note that the IO monad is similar to the `Try` monad: `Try[A]` is "an eagerly evaluated computation of `A` that might have failed". It doesn't have laziness and it doesn't have cancellation, but apart from that they are the same.
 
-The take away here is that it's lazy; the IO monad is just a means to achieve laziness. If you ever go through the [Red Book], you will notice that the author doesn't introduce the IO monad until the last chapters since we can encode laziness just as well with regular functions; just use thunks (aka. `() => A`) instead of `A`. In almost all modern Scala though, we use `IO` and that is also what the Practical FP in Scala uses.
+The take away here is that it's lazy; the IO monad is just a means to achieve laziness, thunks are another (i.e. `() => A` instead of `A`), but in real world Scala applications we mostly use `IO` <footnote 2 and 3>.
 
 I like to highlight that when all side effects in a program is lazily evaluated, the programmer needs to be explicit about how to compose them, example:
 
@@ -230,11 +232,29 @@ def runLogic(counters: Counters, database: Database): IO[Unit] = ???
 
 ```
 
-Since line 2 and 3 has no side effects, we need to _either_ compose them with `flatMap` or compose them with `map2` or `mapN`. Remember that `flatMap` means "evaluate the first argument, _then_ evaluate the second one", while `mapN` means "evalute these two arguments, they are independent" (which is why the callback gets passed the result of both at the same time).
+You see here why `IO` is ubiquitous in functional style code bases. Both `initializeCounters` and `setupDatabase` obviously have side effects. The implementations of these methods typically run as far as they can get without side effects, and then they wrap the remainder in `IO` so that the execution is deferred. This is how we turn functions with side effects into pure functions; it might seem like cheating, but there are benefits to this.
 
-In other words, we express in the code snippet above that `initializeCounters` and `setupDatabase` might be parallelized if future maintainers of the code desires to do so. If we had composed with `flatMap` (or a `for`-comprehension) instead, we would've stated the opposite, they may _not_ be parallelized even though they look independent from their signature.
+Since line 2 and 3 has no side effects, we need to _either_ compose them with `flatMap` or compose them with `map`, `map2` , `mapN` or similar. Remember that `flatMap` means "evaluate the first argument, _then_ evaluate the second one", while `mapN` means "evaluate these two arguments, they are independent" (which is why the callback gets passed the result of both at the same time).
+
+In the code snipped above, we express that `initializeCounters` and `setupDatabase` might be parallelized if future maintainers of the code desires to do so (since we compose with `mapN`). If we had composed with `flatMap` (or a `for`-comprehension) instead, we would've stated the opposite, they may _not_ be parallelized even though they look independent based on their signatures.
+
+The point to remember is this: Functional programs is constructed by dividing up execution paths with lazy evaluation, and then gluing them together with `map`, `flatMap` and friends. This is the reason `IO` and `Monad` is A Big Thing™. It's not that they are advanced concepts per se—they're not—it's just that they are the interfaces that captures laziness (`IO.apply`) and glue (`Monad.{flatMap, map, …}`).
+
+We'll leave the IO and the monad at that. The implications of laziness and glue are quite big, and there's numerous papers and even more blog posts about them, see the "Further reading" section. My advice to you is to not over-complicate it in the beginning, if you understood the text above, then you're more than set for the Practical FP in Scala book. Be as concerned with category theory as you are with graph theory or number theory. They are all awesome and you just need to prioritize your time; a few choose _now_, many choose some time, and some choose never.
 
 There are some finer points to cats effect's IO monad, and if you're interested, the [official documentation](https://typelevel.org/cats-effect/datatypes/io.html) is pretty good (and long). You will get far by just remembering that `IO[A]` is a lazily computed `A` though.
+
+<footnote 2>: The [Red Book] sticks with functions as a means to achieve laziness for almost the entire book. The `IO` monad isn't introduced until the last part of the book. 
+
+<footnote 3>: Functions allocates stack frames and composing enough functions together inevitably lead to `StackOverflowError`. The IO monad uses Tricks to avoid this (it allocates objects on the heap instead), and this is one of the reasons for why we use it.
+
+## Further reading
+
+If the book and this text is not enough, then you might be interested in these articles:
+
+* Kinds of types in Scala (3-part series): https://kubuszok.com/2018/kinds-of-types-in-scala-part-1/
+* What we talk about when we talk about monads: https://arxiv.org/pdf/1803.10195.pdf
+* Why functional programming matters: https://www.cs.kent.ac.uk/people/staff/dat/miranda/whyfp90.pdf
 
 # Chapter 2
 

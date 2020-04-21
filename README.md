@@ -15,7 +15,7 @@
   - [Further reading](#further-reading)
 - [Chapter 2](#chapter-2)
   - [Effectful computations, `F[_]`](#effectful-computations-f_)
-  - [Cats syntax: `>>` , `*>`](#cats-syntax---)
+  - [Applicative and monadic composition,  `*>` , `>>`](#applicative-and-monadic-composition----)
   - [Sequential vs concurrent state](#sequential-vs-concurrent-state)
 - [References](#references)
 
@@ -262,9 +262,9 @@ If the book and this text is not enough, then you might be interested in these a
 
 TBD
 
-## Cats syntax: `>>` , `*>` 
+## Applicative and monadic composition,  `*>` , `>>` 
 
-The Cats [Glossay](https://typelevel.org/cats/nomenclature.html) page is helpful when encoutering weird syntax. The ones that are used in the book are covered here:
+The Cats [Glossary](https://typelevel.org/cats/nomenclature.html) page is helpful when encoutering weird syntax. The ones that are used in the book are covered here:
 
 Both `*>` and `>>` are combinators that combines two values and discards the left one. Examples
 
@@ -277,28 +277,31 @@ foo
 res1: Int = 42
 ```
 
-The difference lies in the semantics of the composition. Remember that cats provides two type classes for composing two effectful computations: `Applicative` and `Monad`, the syntax `*>` and `>>` is applicative and monadic composition respectively.  Example:
+The difference lies in the semantics of the composition. Remember that cats provides two type classes for composing two effectful computations: `Applicative` and `Monad`, the syntax `*>` and `>>` is applicative and monadic composition respectively.  `*>` is an alias for `productRight` and `>>` is an alias for `flatMap`. Here are the method definitions:
 
 ```
-val a: IO[Int] = ???
-val b: IO[Int] = ???
-
-// These two are identical <footnote 1>
-val result: IO[Int] = (a, b).mapN((_, vb) => vb)
-val result: IO[Int] = a *> b
-
-// These two are identical
-val result2: IO[Int] = a.flatMap(_ => b)
-val result2: IO[Int] = a >> b
+def productR[A, B](fa: F[A])(fb: F[B]): F[B]
+def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B]
 ```
 
-The key take away is this: Applicative composition, `*>`, composes two independent effectful computations; monadic composition `>>` composes two dependent effectful computations—the first one needs to run, _then_ the second one needs to run. 
+We think of `productR` as calculating the product, `F[(A, B)]`, and then map that to the right side. Note that there are two valid implementations of `productR`. For the sake of simplicity, let's assume we have a `Monad` instance, then we can implement `productR` in one of two ways <footnote 1>:
 
-If two computations are composed with `*>` it means that they could've been parallelized since they don't depend on one another; that is not the case with `>>`. Also note that there's no need to evaluate the expression `b` in the case of `>>`, it can be (and it is) evaluated lazily.
+```
+def productR[A, B](fa: F[A])(fb: F[B]): F[B] = flatMap(fa)(_ => fb)
+def productR[A, B](fa: F[A])(fb: F[B]): F[B] = flatMap(fb)(b => fa.map(_ => b))
+```
 
+So either evaluate `F[A]` then `F[B]`, or vice versa. Note that just evaluating `F[B]` is not allowed, we need to calculate the product `F[(A, B)]`. What about `.flatMap`? 
 
+```
+def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B]
+```
 
-<footnote 1>: The actual implementation of `*>`, or `productRight`, uses `ap` from Applicative, but it _could've_ used `mapN`. The implementation of `productLeft`, or `<*` does this.
+The only way we can get a `F[B]` is to run the function `f`, but in order to run it we need an `A` so we need to evaluate `F[A]` first. Thus we arrive at the key difference between applicative and monadic composition:
+
+> Applicative composition composes two _independent_ values. You may not assume that one is evaluate before the other, but you may assume that it is sequential and deterministic. Monadic composition composes two _dependent_ values and it's encoded in the definition of `flatMap`.
+
+<footnote 1>: We can implement `productR` in terms of `ap` from `Applicative` also. See the [`Apply`](https://github.com/typelevel/cats/blob/v2.2.0-M1/core/src/main/scala/cats/Apply.scala#L74) class.
 
 ## Sequential vs concurrent state
 

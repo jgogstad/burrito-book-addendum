@@ -397,11 +397,11 @@ In fact, this is the _only_ valid implementation of the def's signature. By cons
 
 > Constraints liberate, liberties constrain
 
-This example is kind of extreme (but not uncommon); in general we aim to know just-enough about our inputs and maximize what clients can infer about the implementation. The term _parametricity_ was coined by Philip Wadler to describe this increase in reasoning, you can read more about it in the paper "Theorems for free!" [4].
+This example is kind of extreme (but not uncommon); in general we aim to know just-enough about our inputs and maximize what clients can infer about the implementation.
 
 ### Kleisli
 
-You see the `Kleisli` type in some of the examples towards the end of the chapter. Just like the type `Function1[A, B]` is the same as `A => B`, a `Kleisli[F, A, B]` is the same as `A => F[B]`. The only reason to prefer a `Kleisli[F, A, B]` over `A => F[B]` is that you get access to more library methods that works with this particular shape of functions. For example, you can compose a `Kleisli[F, A, B]` with a `Kleisli[F, B, C]` and get a `Kleisli[F, A, C]`. That is not so straight forward if you just have `A => F[B]` and `B => F[C]` .
+You see the `Kleisli` type in some of the examples towards the end of the chapter. Just like the type `Function1[A, B]` is the same as `A => B`, a `Kleisli[F, A, B]` is the same as `A => F[B]`. The only reason to prefer a `Kleisli[F, A, B]` over `A => F[B]` is that you get access to more library methods that works with this particular shape of functions. For example, you can compose a `Kleisli[F, A, B]` with a `Kleisli[F, B, C]` and get a `Kleisli[F, A, C]`. That is not so straight forward if you just have `A => F[B]` and `B => F[C]` . Kleisli's are invoked in the same way as `Function[A,B]`: `someKleisli(42)`.
 
 
 
@@ -447,11 +447,67 @@ The only way we can get a `F[B]` is to run the function `f`, but in order to run
 
 > Applicative composition composes two _independent_ values. You may not assume that one is evaluate before the other, but you may assume that it is sequential and deterministic. Monadic composition composes two _dependent_ values and it's encoded in the definition of `flatMap`.
 
+## State and Ref
+
+The author presents `State` as the sequential counterpart to `Ref`. This is the first and last time you will encounter `State` in this book, and I would say it's one of the lesser used monads. If the sequential part wasn't entirely clear, we're revisiting that in this section. That said, `Ref` is the more commonly used data structure for handling state so feel free to skip ahead.
+
+I like to use the "a monad is a container" metaphor when thinking about `State`. The `State` container contains a value as usual, and an additional "state" structure which is also a value. The `map` and `flatMap` functions behave like they do for other types where this metapahor fits (`Option`, `Try`, …), `map` lets you change the value and `flatMap` lets you change the entire container. In addition, there are methods for inspecting and changing the state part of the monad.
+
+The point in with "sequential state" is just to contrast it with state that would be accessible from multiple places at once. A cache would be an example of state that is not sequential—multiple threads could access it at the same time. Let's take an example of "sequential state", this time a copy from the Cats documentation on [State](https://typelevel.org/cats/datatypes/state.html) with some very minor modifications:
+
+```scala
+final case class Robot(
+  id: Long,
+  sentient: Boolean,
+  name: String,
+  model: String)
+
+object Robot {
+  private val rng = new scala.util.Random(0L)
+  
+  def createRobot(): Robot = {
+    val id = rng.nextLong()
+    val sentient = rng.nextBoolean()
+    val isCatherine = rng.nextBoolean()
+    val name = if (isCatherine) "Catherine" else "Carlos"
+    val isReplicant = rng.nextBoolean()
+    val model = if (isReplicant) "replicant" else "borg"
+    Robot(id, sentient, name, model)
+  }
+}
+```
+
+The random number generator `rng` is accessed sequentially—one invocation after another. Note that `rng.nextBoolean` is not referentially transparent. We can't refactor multiple identical expression into a single expression without changing semantics. We can make it referentially transparent with the `State` monad; the cats documentation already does a brilliant job at describing how, see the section [Cleaning it up with State](https://typelevel.org/cats/datatypes/state.html#cleaning-it-up-with-state).
+
+In summary, State is useful whenever you find yourself in need of a locally scoped `var`. In the example above, the `var` is used internally in `scala.util.Random` (it is actually not locally scoped, but we assume that thread safety is handled internally in `scala.util.Random`). In such scenarios, you can use `State` to carry your state and avoid the `var`.
+
+Is `var` always bad? No, it isn't. Referential transparency is not an end goal in itself, it just a means to achieve code that is easy to reason about, code that survives handoffs between multiple maintainers, and code that is verifiable by the compiler. I think for this reason, `State` is not as ubiqutous as many other monads, in fact, I don't believe it's much used and it's the last time you'll encounter it in this book. If you want some social evidence that `var` is OK, find your favorite purely functional library on github and do a code search, you will most likely find plenty.
+
+## Error handling
+
+The error handling chapter demonstrates `MonadError` and `ApplicativeError` for error handling, and you also meet our old friend the [kind projector](#kind-projector) plugin. Note that the idiomatic way of working with these types, is just to define a type alias, like he does:
+
+```scala
+type ApThrow[F[_]] = ApplicativeError[F, Throwable]
+```
+
+The kind projector is cool and all, but if we can have less typing and less abstractions we choose that. There are use cases for it, like the classy prisms example that ends this chapter, but for `ApplicativeError` with `Throwable` as the error type, a type alias is just fine.
+
+The last example of this chapter is probably premature if you haven't worked with http4s and that's fine. It demonstrates a technique where we can be more specific about in what ways our code can fail.
+
 <footnote 1>: We can implement `productR` in terms of `ap` from `Applicative` also. See the [`Apply`](https://github.com/typelevel/cats/blob/v2.2.0-M1/core/src/main/scala/cats/Apply.scala#L74) class.
+
+## Further reading
+
+* In the context of effectful computations; the term _parametricity_ was coined by Philip Wadler to describe the increase in reasoning you obtain by parametric polymorphism, you can read more about it in the paper "Theorems for free!" [4].
 
 # Chapter 3
 
+No comments to this chapter
 
+# Chapter 4
+
+TBD
 
 
 

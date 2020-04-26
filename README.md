@@ -14,9 +14,16 @@
   - [IO Monad](#io-monad)
   - [Further reading](#further-reading)
 - [Chapter 2](#chapter-2)
+  - [Strongly typed functions](#strongly-typed-functions)
   - [Effectful computations, `F[_]`](#effectful-computations-f_)
+    - [Reasoning with abstract effects](#reasoning-with-abstract-effects)
+    - [Kleisli](#kleisli)
   - [Applicative and monadic composition,  `*>` , `>>`](#applicative-and-monadic-composition----)
-  - [Sequential vs concurrent state](#sequential-vs-concurrent-state)
+  - [State and Ref](#state-and-ref)
+  - [Error handling](#error-handling)
+  - [Further reading](#further-reading-1)
+- [Chapter 3](#chapter-3)
+- [Chapter 4](#chapter-4)
 - [References](#references)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->

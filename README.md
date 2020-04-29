@@ -9,6 +9,7 @@
   - [Type class recap](#type-class-recap)
   - [Type class coherence](#type-class-coherence)
   - [Higher kinded types](#higher-kinded-types)
+    - [Type class revisited](#type-class-revisited)
   - [Kind projector](#kind-projector)
   - [Referential transparency](#referential-transparency)
   - [IO Monad](#io-monad)
@@ -115,10 +116,6 @@ _Coherence_ refers to a situation when
 
 A _type class_ is an interface that allows for ad-hoc polymorphism that is also coherent. From what we've gone through so far, we can say that a type class is an interface `I[_]` where there is at most one implementation `I[A]` for any type `A`. 
 
-## Functors, monads, applicatives
-
-
-
 ## Higher kinded types
 
 As with type classes and polymorphism, it's useful to do a quick recap on types and kinds before discussing higher kinded types.
@@ -163,7 +160,7 @@ Remember that that with ad-hoc polymorphism we take the implementing type as a t
 
 Here's an exercise for you: open a REPL and define a function with a type parameter, play around with what types you can pass to it (I use [Ammonite](https://ammonite.io) below). Try out the types in the table above:
 
-```
+```scala
 @ def foo[F[_,_]]: String = "foo"
 defined function foo
 
@@ -173,6 +170,20 @@ res2: String = "foo"
 @ foo[List]
 Compilation Failed
 ```
+
+### Type class revisited
+
+Now we're ready to revisit our type class definition. A type class is a parameterized trait `I` where the _shape_ of the parameter constrains the shape of the implementing type.
+
+For example, to restrict an interface to only be implementable by types with one hole, we would define our interface as
+
+```scala
+trait MyInterface[F[_]] {
+
+}
+```
+
+
 
 ## Kind projector
 
@@ -425,7 +436,7 @@ The Cats [Glossary](https://typelevel.org/cats/nomenclature.html) page is helpfu
 
 Both `*>` and `>>` are combinators that combines two values and discards the left one. Examples
 
-```
+```scala
 scala> (IO(println("foo")) *> IO(42)).unsafeRunSync
 foo
 res0: Int = 42

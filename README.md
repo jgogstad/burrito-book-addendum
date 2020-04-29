@@ -115,6 +115,10 @@ _Coherence_ refers to a situation when
 
 A _type class_ is an interface that allows for ad-hoc polymorphism that is also coherent. From what we've gone through so far, we can say that a type class is an interface `I[_]` where there is at most one implementation `I[A]` for any type `A`. 
 
+## Functors, monads, applicatives
+
+
+
 ## Higher kinded types
 
 As with type classes and polymorphism, it's useful to do a quick recap on types and kinds before discussing higher kinded types.
@@ -326,7 +330,7 @@ Debashish [2] describes effects as "additional structure to a computation". We s
 def divide(a: Int, b: Int): Try[Int]
 ```
 
-In the example above we add the _effect of failing_ in `productTry` by using `Try` as `F`. The computation is converting two `Int`s into a single `Int`, the additional structure in a possible failure and it's captured in the wrapping type `Try`. With the metaphore "F is a computational context" in mind, then:
+In the example above we add the _effect of failing_ in `productTry` by using `Try` as `F`. The computation is converting two `Int`s into a single `Int`; the additional structure in a possible failure and it's captured in the wrapping type `Try`. With the metaphore "F is a computational context" in mind, then:
 
 * `IO` is the effect of lazy evaluation that can be cancelled and run concurrently
 * `Option` is the effect of missing value
@@ -367,7 +371,7 @@ def product(a: Try[Int], b: Try[Int]): Try[(Int, Int)] =
   }
 ```
 
-In fact there are infinitely many. If we _code against the API and not the implementation_ we can be more specific about what APIs are actually in use. This should sound familiar to anyone with a Java/C#/C++ background. Let's abstract `Try` into an abstract type `F[_]` and declare what interfaces were using:
+In fact there are infinitely many. If we _code against the API and not the implementation_ we can be more specific about what APIs are actually in use, this should sound familiar to anyone with a Java/C#/C++ background. Let's abstract `Try` into an abstract type `F[_]` and declare what interfaces were using:
 
 ```scala
 import cats.syntax.all._
@@ -393,14 +397,14 @@ def product[F[_]](implicit M: Monad[F])(a: F[Int], b: F[Int]): F[(Int, Int)] = ?
 
 In order to invoke with `Try` as we do above, we would need to bring an implicit into scope of type `Monad[Try]`. You can import this from cats, either with the catch-all `import cats.implicits._` or the specific `import cats.instances.try_`.
 
-So what did this achieve? We reduced the number of valid implementations, many of the implementations above used `Try` specific APIs, and those no longer compiles. If we settle for the `flatMap` and `map` implementation above, we can abstract over `Int` also, arriving at:
+So what did this achieve? We reduced the number of valid implementations. Many of the implementations above used `Try` specific APIs, and those no longer compiles. If we settle for the `flatMap` and `map` implementation above, we can abstract over `Int` also, arriving at:
 
 ```scala
 def product[F[_]: Monad, A, B](a: F[A], b: F[B]): F[(A, B)] =
   a.flatMap(valueA => b.map(a -> _))
 ```
 
-In fact, this is the _only_ valid implementation of the def's signature. By constraining ourselves to only working with the Monad API and knowing nothing about the types `A` and `B` we eliminate many implementations of the method signature, and clients can easier reason about what it does without being exposed to the details of the implementation. To quote Runar Bjarnason [1]:
+In fact, this is the _only_ valid implementation of the def's signature. By _constraining_ ourselves to only working with the Monad API and knowing nothing about the types `A` and `B` we eliminate many implementations of the method signature, and clients can easier reason about what it does without being exposed to the details of the implementation. To quote Runar Bjarnason [1]:
 
 > Constraints liberate, liberties constrain
 
@@ -417,7 +421,7 @@ You see the `Kleisli` type in some of the examples towards the end of the chapte
 
 ## Applicative and monadic composition,  `*>` , `>>` 
 
-The Cats [Glossary](https://typelevel.org/cats/nomenclature.html) page is helpful when encoutering weird syntax. The ones that are used in the book are covered here:
+The Cats [Glossary](https://typelevel.org/cats/nomenclature.html) page is helpful when encountering weird syntax. The ones that are used in the book are covered here:
 
 Both `*>` and `>>` are combinators that combines two values and discards the left one. Examples
 
@@ -432,21 +436,21 @@ res1: Int = 42
 
 The difference lies in the semantics of the composition. Remember that cats provides two type classes for composing two effectful computations: `Applicative` and `Monad`, the syntax `*>` and `>>` is applicative and monadic composition respectively.  `*>` is an alias for `productRight` and `>>` is an alias for `flatMap`. Here are the method definitions:
 
-```
+```scala
 def productR[A, B](fa: F[A])(fb: F[B]): F[B]
 def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B]
 ```
 
 We think of `productR` as calculating the product, `F[(A, B)]`, and then map that to the right side. Note that there are two valid implementations of `productR`. For the sake of simplicity, let's assume we have a `Monad` instance, then we can implement `productR` in one of two ways <footnote 1>:
 
-```
+```scala
 def productR[A, B](fa: F[A])(fb: F[B]): F[B] = flatMap(fa)(_ => fb)
 def productR[A, B](fa: F[A])(fb: F[B]): F[B] = flatMap(fb)(b => fa.map(_ => b))
 ```
 
 So either evaluate `F[A]` then `F[B]`, or vice versa. Note that just evaluating `F[B]` is not allowed, we need to calculate the product `F[(A, B)]`. We say that applicative composition expresses composition of _independent_ effects. The fact that there is two valid implemententations captures that the effects are in fact independent. What about `.flatMap`? 
 
-```
+```scala
 def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B]
 ```
 
@@ -460,7 +464,7 @@ The author presents `State` as the sequential counterpart to `Ref`. This is the 
 
 I like to use the "a monad is a container" metaphor when thinking about `State`. The `State` container contains a value as usual, and an additional "state" structure which is also a value. The `map` and `flatMap` functions behave like they do for other types where this metapahor fits (`Option`, `Try`, …), `map` lets you change the value and `flatMap` lets you change the entire container. In addition, there are methods for inspecting and changing the state part of the monad.
 
-The point in with "sequential state" is just to contrast it with state that would be accessible from multiple places at once. A cache would be an example of state that is not sequential—multiple threads could access it at the same time. Let's take an example of "sequential state", this time a copy from the Cats documentation on [State](https://typelevel.org/cats/datatypes/state.html) with some very minor modifications:
+The point with "sequential state" is just to contrast it with state that would be accessible from multiple places at once. A cache would be an example of state that is not sequential—multiple threads could access it at the same time. Let's take an example of "sequential state", this time a copy from the Cats documentation on [State](https://typelevel.org/cats/datatypes/state.html) with some very minor modifications:
 
 ```scala
 final case class Robot(
@@ -500,7 +504,7 @@ type ApThrow[F[_]] = ApplicativeError[F, Throwable]
 
 The kind projector is cool and all, but if we can have less typing and less abstractions we choose that. There are use cases for it, like the classy prisms example that ends this chapter, but for `ApplicativeError` with `Throwable` as the error type, a type alias is just fine.
 
-The last example of this chapter is probably premature if you haven't worked with http4s and that's fine. It demonstrates a technique where we can be more specific about in what ways our code can fail.
+The last example of this chapter is probably premature if you haven't worked with http4s and that's fine. It demonstrates a technique where we can be more specific about what ways our code can fail.
 
 <footnote 1>: We can implement `productR` in terms of `ap` from `Applicative` also. See the [`Apply`](https://github.com/typelevel/cats/blob/v2.2.0-M1/core/src/main/scala/cats/Apply.scala#L74) class.
 

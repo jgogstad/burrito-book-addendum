@@ -538,9 +538,13 @@ TBD
 # References
 
 [1] https://www.microsoft.com/en-us/research/wp-content/uploads/1997/01/multi.pdf
+
 [2] [Functional and Reactive domain modelling](https://www.amazon.com/Functional-Reactive-Domain-Modeling-Debasish/dp/1617292249)
+
 [3] https://www.youtube.com/watch?v=GqmsQeSzMdw
+
 [4] https://ecee.colorado.edu/ecen5533/fall11/reading/free.pdf
+
 [5] https://www.amazon.com/Functional-Programming-Scala-Paul-Chiusano/dp/1617290653
 
 

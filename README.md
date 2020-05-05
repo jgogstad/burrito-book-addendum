@@ -239,11 +239,11 @@ The equal sign literally means _equals_. The left hand side is just an alias for
 
 ## IO Monad
 
-The semantics of `IO[A]` is "a lazily evaluated `A`, the evaluation might fail". The `IO` type from cats-effect has the additional clause "…, and the evaluation might be cancelled", we will return to that later in this text. Note that the IO monad is similar to the `Try` monad: `Try[A]` is "an eagerly evaluated computation of `A` that might have failed". It doesn't have laziness and it doesn't have cancellation, but apart from that they are similar.
+The semantics of `IO[A]` is "a lazily evaluated `A`, the evaluation might fail or be cancelled". Note that apart from the cancellation part, the IO monad is similar to the `Try` monad: `Try[A]` is "an eagerly evaluated computation of `A` that might have failed".
 
-The take away here is that it's lazy; the primary reason for using the IO monad is to do lazy evaluation, thunks are another (i.e. `() => A` instead of `A`), but in real world Scala applications we mostly use `IO` <footnote 2 and 3>. Using IO over thunks gives us concurrency and cancellation, and we can build lots of interesting combinators on these primitives. More on that later.
+The _purpose_ of the IO monad is to turn side effects into values, values which can then be composed later on. The mechanism it uses for this is laziness. When you wrap a code block or a method invocation in `IO`, it's lazily evaluated.
 
-I like to highlight that when all side effects in a program is lazily evaluated, the programmer needs to be explicit about how to compose them, example:
+When all side effects in a program are values, the programmer needs to be explicit about how to compose them, for example:
 
 ```scala
 def run(args: Array[String]): IO[ExitCode] = {
@@ -257,15 +257,22 @@ def runLogic(counters: Counters, database: Database): IO[Unit] = ???
 
 ```
 
-Both `initializeCounters` and `setupDatabase` obviously have side effects. The implementations of these methods typically run as far as they can get without side effects, and then they wrap the remainder in `IO` so that the execution is deferred. This is how we turn functions with side effects into pure functions; it might seem like cheating, but there are benefits to this. 
+Both `initializeCounters` and `setupDatabase` obviously have side effects. The implementations of these methods typically run as far as they can get without side effects, and then they wrap the remainder in `IO` so that the execution is deferred. This is how we turn functions with side effects into pure functions. In the example above we use `mapN` to combine them, this communicates that the side effects are independent, more about _applicative and monadic composition_ later on.
 
-For example, in the example above, since `setupDatabase` is lazivly evaluated, we can define generic methods for error handling, retries, timeouts, cirtuit breakers, logging etc. and compose them with the value held in `val database`.  We can then focus `setupDatabase` on _only_ that, setting up the database. If it was eagerly evaluated, we'd have to mix all of the generic functionalities just mentioned with the domain logic of setting up the database. Laziness thus gives us increased modularity and reuse, as well as better separation of concerns.
+Apart from being explicit about what side effects are dependent and not, here are some other things we can model with cats-effect and `IO`:
 
-Functional programs is constructed by dividing up execution paths with lazy evaluation, and then gluing them together with `map`, `flatMap` and friends. This is the reason `IO` and `Monad` is A Big Thing™. It's not that they are advanced interfaces per se—they're not—it's just that they are the interfaces that captures laziness (`IO.apply`) and glue (`Monad.{flatMap, map, …}`).
+* Declarative and easy-to-reason about concurrency and parallelism
+* Resource safety across concurrent and parallel boundaries
+* Primitivies that lets us easily build combinators like circuit breakers, timeouts, retry logic etc.
+* Green threads, also known as fibers
 
-We'll leave the IO monad at that. If you're not entirely sold by the laziness argument, I encourage you to have a look at John Hughes' paper "Why functional programming matteres". You will also hopefully appreciate the power of laziness and pure functions as you go through the Practival FP in Scala book. Finally, the [official documentation](https://typelevel.org/cats-effect/datatypes/io.html) to the IO monad is pretty good (and long). It demonstrates how to build retries, timeouts and many more combinators with the IO monad. You will get far by just remembering that `IO[A]` is a lazily computed `A` though.
+By treating side-effects as values we get increased modularity and reuse, better separation of concerns and easier to reason about programs, particularly in the case of concurrency and parallelism.
+
+The [official documentation](https://typelevel.org/cats-effect/datatypes/io.html) to the IO monad is pretty good (and long). It demonstrates how to build retries, timeouts and many more combinators with the IO monad. You will get far by just remembering that `IO[A]` is a lazily computed `A` though, accompanied by a side-effect.
 
 #### A short note on Monads in general
+
+Functional programs are constructed by dividing up execution paths with lazy evaluation, and then gluing them together with `map`, `flatMap` and friends. This is the reason `IO` and `Monad` is A Big Thing™. It's not that they are advanced interfaces per se—they're not—it's just that they are the interfaces that captures laziness (`IO.apply`) and glue (`Monad.{flatMap, map, …}`).
 
 Monads are commonly defined with an interface containing two methods
 

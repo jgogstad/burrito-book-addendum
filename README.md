@@ -541,11 +541,11 @@ The last example of this chapter is probably premature if you haven't worked wit
 
 These chapters introduces the _tagless final encoding_ in Scala and gives an example of how this way of structuring program code is applied to the book's running example.
 
-One way to create programs, in any programming language, is to first create a DSL to express them with and then "run" the DSL. The pieces of the DSL, the "atoms" or syntax if you will—restricts what kind of logic that can be expressed in it; with tight and precise syntax in the DSL follows less invalid programs.
+One way to create programs, in any programming language, is to first create a DSL to express them with and then "run" the DSL. The pieces of the DSL, the "atoms" or syntax if you will—restricts what kind of logic that can be expressed in it; with tight and precise syntax follows less invalid programs.
 
 The "tagless final" approach to DSLs is a bit peculiar if you come from a Java, C# or other high level imperative languages. We're going to explain tagless final by first looking at an _initial encoding_ in Java, and then contrast that with the tagless final encoding.
 
-Here is an example of a Java DSL building a program that transfers data between files (expressed in [Apache Camel](https://camel.apache.org)): 
+Here is an example of a Java DSL that constructs a program that transfers data between files (expressed in [Apache Camel](https://camel.apache.org)): 
 
 ```java
 from("file:src/data?noop=true")
@@ -556,11 +556,11 @@ from("file:src/data?noop=true")
       .to("file:target/messages/others");
 ```
 
-The _syntax_ of the DSL is `from`, `choice` , `when` etc; more specifically, it's the types that these functions return. After invoking `from(…)` the returned object's type constrains the operations you might continue with; the programmer constructs programs using a "fluent API", always calling methods on the last returned value. The result from running the code is an object structure which needs to be explicitly interpreted and run by Apache Camel.
+The _syntax_ of the DSL is `from`, `choice` , `when` etc; more specifically, it's the types that these functions return. After invoking `from(…)` the returned object's type constrains the operations you might continue with; the programmer constructs programs using a "fluent API", always calling methods on the last returned value. The result from running the code is an object structure which needs to be explicitly interpreted and run by Apache Camel <footnote 1>.
 
 This is an example of an _initial encoding_. The DSL builds up an object graph and the interpreter needs to match on the types in the graph to execute it. It suffers from what is known as the _expression problem_ [7]. It is impossible to add operations to the DSL without recompiling the entire DSL (Apache Camel in this example).
 
-Tagless final is a pattern that is used to expressed custom DSLs for your domain and interpreters for them. The resulting DSL doesn't suffer from the expression problem, and it's easy to add operations to it without recompiling existing interpreters. Tagless final is not a library, it's just a way to structure a DSL, fluent APIs are another.
+Tagless final is a pattern that is used to express custom DSLs for your domain and interpreters for them. The resulting DSL doesn't suffer from the expression problem—it's easy to add operations to it without recompiling existing interpreters. Tagless final is not a library, it's just a way to structure a DSL, fluent APIs are another.
 
 By expressing programs with tagless final we aim to achieve the following, try to see if you can identify how items in this list are achieved when reading ahead:
 
@@ -573,6 +573,8 @@ By expressing programs with tagless final we aim to achieve the following, try t
 4. The type of programs expresses how the DSL is used to clients
 
 Let's start with a toy example from one of the original papers, expressed in Scala.
+
+<footnote 1>: Is this functional programming in Java? Yes it is!
 
 ## Toy example
 
@@ -598,7 +600,7 @@ The "language" here is the _Domain Specific Language_ (DSL), the metalanguage is
 >
 > Excerpt From: Paul Chiusano Rúnar Bjarnason. “Functional Programming in Scala” [9].
 
-Algebras without laws doesn't really make sense, but the term has stuck in the Scala community so we'll use it here as well <footnote-1>.
+Algebras without laws doesn't really make sense, but the term has stuck in the Scala community so we'll use it here as well <footnote 1>.
 
  Programs are expressed by combing the syntax, for example:
 
@@ -606,11 +608,12 @@ Algebras without laws doesn't really make sense, but the term has stuck in the S
 def program[A](dsl: FExp[A]): A = {
   val addTwo: A   = dsl.add(dsl.lit(1), dsl.lit(2))
   val negate: A   = dsl.negate(addTwo)
+  
   dsl.add(dsl.lit(8), negate)
 }
 ```
 
-What is the result of running this program? It depends on the choice of `A` and the implementation of `FExp[A]`. We say we choose the _semantic domain_ of the DSL by choosing a type for `A`, and we call the implementation of the trait for the _interpreter_ for that `A`.
+What is the result of running this program? It depends on the choice of `A` and the implementation of `FExp[A]`. We say that we choose the _semantic domain_ of the DSL by choosing a type for `A`, and we call the implementation of the trait for the _interpreter_ for that `A`.
 
 For the example above we could say that the we have `String` semantics and a `String` interpreter. It would format the expression to a pretty `String`:
 
@@ -665,11 +668,11 @@ _Solution 1_: See [eli-jordan/tagless-final-jam](https://github.com/eli-jordan/t
 
 _Exercise 2:_ Express laws for `FExp[A]`. 
 
-  a) The algebra should be associative for all operators (that is `4 + (5 + 6) == (4 + 5) + 6 `)
+    a) The algebra should be associative for all operators (that is `4 + (5 + 6) == (4 + 5) + 6 `)
 
-  b) Express the law of unitality for `add`: `4 + 0 == 0 + 4`. Does it hold for both interpreters?
+    b) Express the law of unitality for `add`: `4 + 0 == 0 + 4`. Does it hold for both interpreters?
 
-<footnote-1> : It is possible to express laws for some of these algebras, and very much for this toy example. Have a look at [discipline](https://github.com/typelevel/discipline) for a good library to express laws with.
+<footnote 1> : It is possible to express laws for some of these algebras, and very much for this toy example. Have a look at [discipline](https://github.com/typelevel/discipline) for a good library to express laws with.
 
 ## Real world examples, F[_]
 
@@ -677,12 +680,12 @@ The book introduces tagless final with the following algebra
 
 ```scala
 trait Items[F[_]] {
-	def getAll: F[List[Item]] 
+  def getAll: F[List[Item]] 
   def add(item: Item): F[Unit]
 }
 ```
 
-You see the only difference from the toy example is the shape of the type parameter. It's now a type constructor and not a value type. The point here is that we abstract over the semantic domain, what shape it has isn't really important, although in practice it's usually `F[_]` and then we call it the _effect_ and not semantic domain. Can you think of some valid effects and interpreters? 
+You see the only difference from the toy example is the shape of the type parameter. It's now a type constructor and not a value type. The point here is that we abstract over the semantic domain, what shape it has isn't really important. In practice it's usually `F[_]` and then we call it the _effect_ and not semantic domain. Can you think of some valid effects and interpreters? 
 
 Here's a couple:
 
@@ -695,14 +698,14 @@ _Exercise 2:_ Implement `ItemsInMemory[State[List[Item], *]]` and write a progra
 
 _Exercise 3:_ 
 
-  a) Choose an effect for your in-memory interpreter that support errors, but not side effects
+    a) Choose an effect for your in-memory interpreter that support errors, but not side effects
 
-  b) (Hard) Can you create an in-memory interpreter that can be used in programs that requires `Concurrent` for `F[_]`? Make a decision whether you want to really have concurrency or not in your tests and create an implementation accordingly.
+    b) (Hard) Can you create an in-memory interpreter that can be used in programs that requires `Concurrent` for `F[_]`? Make a decision whether you want to really have concurrency or not in your tests and create an interpreter accordingly.
 
 
 ### Expressing intent
 
-Let's look at how programs expressed with in tagless final exposes important implementation details in the types
+Let's look at how programs expressed with in tagless final exposes important implementation details in the types. From the book we have this program:
 
 ```scala
 final class CheckoutProgram[F[_]: Monad](

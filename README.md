@@ -434,7 +434,7 @@ You see the `Kleisli` type in some of the examples towards the end of the chapte
 
 
 
-<footnote 1>: I like how the semantics of the colon of a context bound is similar to the colon in type annotations. For example in `val a: Int` the colon denotes "is-a" so `a`-is-an-int. Similarly in `F[_]: Monad` can be read as `F`-is-a-monad.
+<footnote 1>: I like how the semantics of the colon of a context bound is similar to the colon in type annotations. For example in `val a: Int` the colon denotes "is-a" relationsihp; so `a`-is-an-int. Similarly in `F[_]: Monad` can be read as `F`-is-a-monad.
 
 
 ## Applicative and monadic composition,  `*>` , `>>` 
@@ -530,17 +530,225 @@ The last example of this chapter is probably premature if you haven't worked wit
 
 * In the context of effectful computations; the term _parametricity_ was coined by Philip Wadler to describe the increase in reasoning you obtain by parametric polymorphism, you can read more about it in the paper "Theorems for free!" [4].
 
-# Chapter 3
+# Chapter 3 & 4 Tagless final encoding
 
-No comments to this chapter
+> Sometimes I ask myself, why are we doing all this? What's the purpose?
+>
+> – Colleague
 
-# Chapter 4
+These chapters introduces the _tagless final encoding_ in Scala and gives an example of how this way of structuring program code is applied to the book's running example.
 
-TBD
+One way to create programs, in any programming language, is to first create a DSL to express them with and then "run" the DSL. The pieces of the DSL, the "atoms" or syntax if you will—restricts what kind of logic that can be expressed in it; with tight and precise syntax in the DSL follows less invalid programs.
+
+The "tagless final" approach to DSLs is a bit peculiar if you come from a Java, C# or other high level imperative languages. We're going to explain tagless final by first looking at an _initial encoding_ in Java, and then contrast that with the tagless final encoding.
+
+Here is an example of a Java DSL building a program that transfers data between files (expressed in [Apache Camel](https://camel.apache.org)): 
+
+```java
+from("file:src/data?noop=true")
+  .choice()
+    .when(xpath("/person/city = 'London'"))
+      .to("file:target/messages/uk")
+    .otherwise()
+      .to("file:target/messages/others");
+```
+
+The _syntax_ of the DSL is `from`, `choice` , `when` etc; more specifically, it's the types that these functions return. After invoking `from(…)` the returned object's type constrains the operations you might continue with; the programmer constructs programs using a "fluent API", always calling methods on the last returned value. The result from running the code is an object structure which needs to be explicitly interpreted and run by Apache Camel.
+
+This is an example of an _initial encoding_. The DSL builds up an object graph and the interpreter needs to match on the types in the graph to execute it. It suffers from what is known as the _expression problem_ [7]. It is impossible to add operations to the DSL without recompiling the entire DSL (Apache Camel in this example).
+
+Tagless final is a pattern that is used to expressed custom DSLs for your domain and interpreters for them. The resulting DSL doesn't suffer from the expression problem, and it's easy to add operations to it without recompiling existing interpreters. Tagless final is not a library, it's just a way to structure a DSL, fluent APIs are another.
+
+By expressing programs with tagless final we aim to achieve the following, try to see if you can identify how items in this list are achieved when reading ahead:
+
+1. Only valid programs can be expressed
+
+2. The DSL can be wrapped up in a JAR, and still extended by a client—meaning, adding more operations to it.
+
+3. We can easily "run" the DSL in-memory or with side effects
+
+4. The type of programs expresses how the DSL is used to clients
+
+Let's start with a toy example from one of the original papers, expressed in Scala.
+
+## Toy example
+
+> A popular way to define and implement a language is to embed it in another. Embedding means to represent terms and values of the object language as terms and values in the metalanguage, so as to interpret the former in the latter [6]
+
+The "language" here is the _Domain Specific Language_ (DSL), the metalanguage is Scala. The toy example we're expressing is translated from [8]. The DSL is expressed as a trait with a type parameter, all returned values are of the parameterized type:
+
+```scala
+  trait FExp[A] {
+    def lit(value: Int): A
+
+    def add(lhs: A, rhs: A): A
+
+    def sub(lhs: A, rhs: A): A
+
+    def mul(lhs: A, rhs: A): A
+  }
+```
+
+"FExp" is the name of our DSL, it contains the _syntax_ of our language. The book uses the term "Algebra" for this type, the intention is to express that it contains the syntax of which we construct our programs. We usually take the term "Algebra" to mean
+
+> “a collection of functions operating over some data type(s), along with a set of laws specifying relationships between these functions”
+>
+> Excerpt From: Paul Chiusano Rúnar Bjarnason. “Functional Programming in Scala” [9].
+
+Algebras without laws doesn't really make sense, but the term has stuck in the Scala community so we'll use it here as well <footnote-1>.
+
+ Programs are expressed by combing the syntax, for example:
+
+```scala
+def program[A](dsl: FExp[A]): A = {
+  val addTwo: A   = dsl.add(dsl.lit(1), dsl.lit(2))
+  val negate: A   = dsl.negate(addTwo)
+  dsl.add(dsl.lit(8), negate)
+}
+```
+
+What is the result of running this program? It depends on the choice of `A` and the implementation of `FExp[A]`. We say we choose the _semantic domain_ of the DSL by choosing a type for `A`, and we call the implementation of the trait for the _interpreter_ for that `A`.
+
+For the example above we could say that the we have `String` semantics and a `String` interpreter. It would format the expression to a pretty `String`:
+
+```scala
+class StringInterpreter extends FExp[String] {
+  def lit(value: Int): String
+  def add(lhs: String, rhs: String): String
+  …
+}
+```
+
+Or, we could choose `Int` as the domain and have integer addition, subtraction etc:
+
+```scala
+class IntInterpreter FExp[Int] {
+  def lit(value: Int): Int
+  def add(lhs: Int, rhs: Int): Int
+  …
+}
+```
+
+We can extend the language by adding more algebras and parameterize them on the same `A`, for instance
+
+```scala
+trait Logarithms[A] {
+  def logN(a: A, base: Int): A
+}
+```
+
+Programs can take both algebras as input and combine them since they are parameterized on the same `A`:
+
+```scala
+class SomeProgram[A](
+  fexp: FExp[A],
+  logs: Logarithm[A]
+) {
+  def logSquare(i: Int): A = {
+    val square = fext.mul(fexp.lit(i), fexp.lit(i))
+    logs.logN(square, 2)
+  }
+}
+```
+
+So even if `FExp[A]` was packaged up in a library, we can add syntax to the DSL without recompilinig `FExp`.
+
+_Exercise 1:_ 
+
+* Create an initial coding called `IExp` for `FExp[A]` and write an interpreter for it.
+* Why is it not possible to extend this DSL?
+
+_Solution 1_: See [eli-jordan/tagless-final-jam](https://github.com/eli-jordan/tagless-final-jam/blob/master/arithmetic/src/main/scala/arithmetic/Arithmetic.scala)
+
+_Exercise 2:_ Express laws for `FExp[A]`. 
+
+  a) The algebra should be associative for all operators (that is `4 + (5 + 6) == (4 + 5) + 6 `)
+
+  b) Express the law of unitality for `add`: `4 + 0 == 0 + 4`. Does it hold for both interpreters?
+
+<footnote-1> : It is possible to express laws for some of these algebras, and very much for this toy example. Have a look at [discipline](https://github.com/typelevel/discipline) for a good library to express laws with.
+
+## Real world examples, F[_]
+
+The book introduces tagless final with the following algebra
+
+```scala
+trait Items[F[_]] {
+	def getAll: F[List[Item]] 
+  def add(item: Item): F[Unit]
+}
+```
+
+You see the only difference from the toy example is the shape of the type parameter. It's now a type constructor and not a value type. The point here is that we abstract over the semantic domain, what shape it has isn't really important, although in practice it's usually `F[_]` and then we call it the _effect_ and not semantic domain. Can you think of some valid effects and interpreters? 
+
+Here's a couple:
+
+* `ItemsLive[IO]`: Interpreter for a semantic domain that captures side effects
+* `ItemsInMemory[State[List[Item], *]]`: Semantic domain keeps state in memory
+
+For other algebras you can imagine using the usual suspects `Try`, `Option` and `Id` to capture failure, absence and no-effects respectively.
+
+_Exercise 2:_ Implement `ItemsInMemory[State[List[Item], *]]` and write a program that uses it
+
+_Exercise 3:_ 
+
+  a) Choose an effect for your in-memory interpreter that support errors, but not side effects
+
+  b) (Hard) Can you create an in-memory interpreter that can be used in programs that requires `Concurrent` for `F[_]`? Make a decision whether you want to really have concurrency or not in your tests and create an implementation accordingly.
 
 
+### Expressing intent
 
+Let's look at how programs expressed with in tagless final exposes important implementation details in the types
 
+```scala
+final class CheckoutProgram[F[_]: Monad](
+  paymentClient: PaymentClient[F],
+  shoppingCart: ShoppingCart[F],
+  orders: Orders[F]
+) {
+
+  def checkout(userId: UserId, card: Card): F[OrderId] = for {
+    cart      <- shoppingCart.get(userId)
+    paymentId <- paymentClient.process(Payment(userId, cart.total, card))
+    orderId   <- orders.create(userId, paymentId, cart.items, cart.total)
+    _         <- shoppingCart.delete(userId)
+  } yield orderId
+  
+}
+```
+
+Ignore the implementation of `checkout` for now, just focus on the type of the program
+
+```scala
+final class CheckoutProgram[F[_]: Monad](
+  paymentClient: PaymentClient[F],
+  shoppingCart: ShoppingCart[F],
+  orders: Orders[F]
+)
+```
+
+From this type we can read that the intention of the original author was to
+
+1. Sequentially compose operations from one or more of the input algebras
+
+Equally important we can reason about what was _not_ the intention of the original author:
+
+* No raising of errors
+* No spawning threads or running concurrently
+* No blocking IO
+
+How can we be so sure? The only restriction the author put on `F` is that is a `Monad`, thus this program doesn't have any APIs to raise errors, spawn threads or do blocking IO. It can _only_ use the interface defined by `Monad` , and that's only `flatMap`. If the original author intented to do applicative composition, or just use `.map`, she would've required `Applicative` or `Functor` instead. If she intended to do concurrency or raise errors, then `Concurrent` and `MonadThrowing`, and so on.
+
+Note that the underlying algebra's could still have these capabilities, we would have to look at the type of the interpreters to know. 
+
+## Conclusion
+
+We've seen that, as other DSLs, tagless final lets us put restrictions on how to express programs. With these restrictions we can limit the number of expressable programs to only, or close to only, valid programs. 
+
+The approach the book takes to creating programs is sometimes called _algebraic design_ [9], we define algebras and compose them into larger programs—only relying on the laws of the algebras to reason about the programs. Then we decide on a representation of the algebras later on.
+
+Finally we saw that tagless final captures _intent_ about large chunks of code in the program types. When we have our maintainer's hat on, we can see what the original author intended and we don't need to read and undertsand every line of code in order to reason about for instance failures or parallelism.
 
 # References
 
@@ -554,8 +762,10 @@ TBD
 
 [5] https://www.amazon.com/Functional-Programming-Scala-Paul-Chiusano/dp/1617290653
 
+[6] [Finally Tagless, Partially Evaluated](http://okmij.org/ftp/tagless-final/JFP.pdf)
 
+[7] https://homepages.inf.ed.ac.uk/wadler/papers/expression/expression.txt
 
+[8] [Typed tagless final interpreters](http://okmij.org/ftp/tagless-final/course/lecture.pdf)
 
-
-[Red Book]: https://www.amazon.com/Functional-Programming-Scala-Paul-Chiusano/dp/1617290653
+[9] [The Red Book]( https://www.amazon.com/Functional-Programming-Scala-Paul-Chiusano/dp/1617290653)

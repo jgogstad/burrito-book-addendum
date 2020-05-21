@@ -23,8 +23,11 @@
   - [State and Ref](#state-and-ref)
   - [Error handling](#error-handling)
   - [Further reading](#further-reading-1)
-- [Chapter 3](#chapter-3)
-- [Chapter 4](#chapter-4)
+- [Chapter 3 & 4 Tagless final encoding](#chapter-3--4-tagless-final-encoding)
+  - [Toy example](#toy-example)
+  - [Real world examples, F[_]](#real-world-examples-f_)
+    - [Expressing intent](#expressing-intent)
+  - [Conclusion](#conclusion)
 - [References](#references)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
